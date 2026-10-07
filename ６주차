@@ -1,0 +1,392 @@
+// 화면 크기
+let canvasWidth = 600;
+let canvasHeight = 600;
+
+// 마우스를 따라다니는 비행기
+let planeX = 0;
+let planeY = 0;
+let state = 0;
+let hit = 0;
+let shake = 0;
+
+let bodyWidth = 10;
+let bodyHeight = 49;
+let wingWidth = 49;
+let wingHeight = 10;
+let tailWidth = 25;
+let tailHeight = 7;
+
+let planeWingY = 4;
+let planeTailY = 19;
+let planeNoseY = 25;
+let planeNoseHeight = 13;
+let noseY = 0;
+
+// 자동차
+let carX = 300;
+let carSpeed = 4;
+
+let carBodyY = 311;
+let carBodyWidth = 60;
+let carBodyHeight = 18;
+let carRoofY = 300;
+let carRoofWidth = 36;
+let carRoofHeight = 15;
+let carWheelX = 18;
+let carWheelY = 323;
+let carWheelSize = 11;
+let carWindowX = 9;
+let carWindowY = 300;
+
+// 충돌 범위
+let planeCollisionSize = 25;
+let carCollisionWidth = 30;
+let carCollisionTop = 290;
+let carCollisionBottom = 330;
+
+// 충돌 진동
+let shakeMin = -5;
+let shakeMax = 5;
+
+// 작은 비행기 위치
+let skyPlaneX = [50, 200, 350];
+let skyPlaneY = [120, 90, 150];
+
+// 작은 비행기 속도
+let skyPlaneSpeedX = [0.5, 0.8, 1.2];
+let skyPlaneSpeedY = [0.03, 0.08, 0.05];
+
+let skyPlaneCount = 3;
+let skyPlaneRightEnd = 630;
+let skyPlaneLeftStart = -30;
+let skyPlaneMinY = 60;
+let skyPlaneMaxY = 160;
+
+// 작은 비행기 크기
+let skyBodyWidth = 24;
+let skyBodyHeight = 3;
+let skyNoseX = 12;
+let skyNoseWidth = 5;
+let skyNoseHeight = 4;
+let skyWingY = 3;
+let skyWingWidth = 10;
+let skyWingHeight = 3;
+let skyTailX = 9;
+let skyTailY = 3;
+let skyTailWidth = 4;
+let skyTailHeight = 6;
+
+let skyColor = 0;
+
+// 별
+let stars = [100, 200, 300, 400, 500];
+let starY = 30;
+let starCount = 5;
+let starSize = 4;
+let starDistance = 0;
+
+let starVisible = [1, 1, 1, 1, 1];
+
+let starColorDistance = 60;
+let starLightDistance = 15;
+let starLightCount = 6;
+let starLightMin = -15;
+let starLightMax = 15;
+
+let offsetX = 0;
+let offsetY = 0;
+let endX = 0;
+let endY = 0;
+
+// 도로
+let solidLineY = 330;
+let dashedLineY = 480;
+let dashedLineSpace = 40;
+let dashedLineLength = 20;
+
+// 착륙등 (추가)
+let landingLight = 0;
+let lightSize = 12;
+let lightMaxSize = 50;
+
+let i = 0;
+let j = 0;
+
+function setup() {
+  createCanvas(canvasWidth, canvasHeight);
+}
+
+function draw() {
+  background(0);
+
+  drawStars();
+
+  changeSkyPlaneColor();
+  moveSkyPlanes();
+  drawSkyPlanes();
+
+  drawRoad();
+  moveCar();
+  drawCar();
+
+  planeX = mouseX;
+  planeY = mouseY;
+
+  checkPlaneState();
+  checkCollision();
+
+  // 착륙등이 켜진 상태에서 마우스를 꾹 누르면 빛이 점점 커짐 (추가)
+  if (landingLight == 1 && mouseIsPressed && lightSize < lightMaxSize) {
+    lightSize += 0.2;
+  }
+
+  drawMousePlane();
+}
+
+// 별 그리기
+function drawStars() {
+  for (i = 0; i < starCount; i++) {
+    if (starVisible[i] == 1) {
+      starDistance = dist(mouseX, mouseY, stars[i], starY);
+
+      starColor();
+
+      noStroke();
+      ellipse(stars[i], starY, starSize, starSize);
+
+      // 별에 닿으면 사라짐
+      if (starDistance < 8) {
+        starVisible[i] = 0;
+      }
+
+      // 별 가까이에 가면 빛나는 효과
+      else if (starDistance < starLightDistance) {
+        stroke(255, 255, 0);
+        strokeWeight(1);
+
+        for (j = 0; j < starLightCount; j++) {
+          offsetX = random(starLightMin, starLightMax);
+          offsetY = random(starLightMin, starLightMax);
+
+          endX = mouseX + offsetX;
+          endY = mouseY + offsetY;
+
+          line(mouseX, mouseY, endX, endY);
+        }
+      }
+    }
+  }
+}
+
+// 별 색상 결정
+function starColor() {
+  if (starDistance < starColorDistance) {
+    fill(255, 255, (starDistance * 255) / starColorDistance);
+  } else {
+    fill(255);
+  }
+}
+
+// 작은 비행기 색 변경
+function changeSkyPlaneColor() {
+  if (keyIsPressed == true) {
+    if (keyCode == 82) {
+      skyColor = 1; // R
+    } else if (keyCode == 71) {
+      skyColor = 2; // G
+    } else if (keyCode == 66) {
+      skyColor = 3; // B
+    } else {
+      skyColor = 0;
+    }
+  } else {
+    skyColor = 0;
+  }
+}
+
+// 작은 비행기 이동
+function moveSkyPlanes() {
+  for (i = 0; i < skyPlaneCount; i++) {
+    skyPlaneX[i] = skyPlaneX[i] + skyPlaneSpeedX[i];
+    skyPlaneY[i] = skyPlaneY[i] - skyPlaneSpeedY[i];
+
+    if (skyPlaneX[i] > skyPlaneRightEnd) {
+      skyPlaneX[i] = skyPlaneLeftStart;
+      skyPlaneY[i] = random(skyPlaneMinY, skyPlaneMaxY);
+    }
+  }
+}
+
+// 작은 비행기 여러 개 그리기
+function drawSkyPlanes() {
+  noStroke();
+  rectMode(CENTER);
+
+  if (skyColor == 0) {
+    fill(255);
+  } else if (skyColor == 1) {
+    fill(255, 0, 0);
+  } else if (skyColor == 2) {
+    fill(0, 255, 0);
+  } else {
+    fill(0, 100, 255);
+  }
+
+  for (i = 0; i < skyPlaneCount; i++) {
+    drawSkyPlane(skyPlaneX[i], skyPlaneY[i]);
+  }
+}
+
+// 작은 비행기 한 대 그리기
+function drawSkyPlane(x, y) {
+  rect(x, y, skyBodyWidth, skyBodyHeight); // 몸통
+  ellipse(x + skyNoseX, y, skyNoseWidth, skyNoseHeight); // 기수
+  rect(x, y + skyWingY, skyWingWidth, skyWingHeight); // 날개
+  rect(x - skyTailX, y - skyTailY, skyTailWidth, skyTailHeight); // 꼬리
+}
+
+// 도로 그리기
+function drawRoad() {
+  stroke(255, 255, 0);
+  strokeWeight(4);
+  line(0, solidLineY, canvasWidth, solidLineY);
+
+  strokeWeight(3);
+
+  for (i = 0; i < canvasWidth; i = i + dashedLineSpace) {
+    line(i, dashedLineY, i + dashedLineLength, dashedLineY);
+  }
+}
+
+// 자동차 이동
+function moveCar() {
+  if (keyIsDown(LEFT_ARROW)) {
+    carX = carX - carSpeed;
+  } else if (keyIsDown(RIGHT_ARROW)) {
+    carX = carX + carSpeed;
+  }
+}
+
+// 자동차 그리기
+function drawCar() {
+  fill(255);
+  noStroke();
+  rectMode(CENTER);
+
+  rect(carX, carBodyY, carBodyWidth, carBodyHeight); // 몸통
+  rect(carX, carRoofY, carRoofWidth, carRoofHeight); // 뚜껑
+  ellipse(carX - carWheelX, carWheelY, carWheelSize, carWheelSize); // 왼쪽 바퀴
+  ellipse(carX + carWheelX, carWheelY, carWheelSize, carWheelSize); // 오른쪽 바퀴
+
+  fill(0);
+  textSize(12);
+  textAlign(CENTER, CENTER);
+  text("ㅁ", carX - carWindowX, carWindowY);
+  text("ㅁ", carX + carWindowX, carWindowY);
+}
+
+// 비행기 상태 확인
+function checkPlaneState() {
+  noseY = planeY - planeNoseY;
+
+  if (noseY > dashedLineY) {
+    state = 0;
+  } else if (noseY > solidLineY) {
+    state = 1;
+  } else {
+    state = 2;
+  }
+}
+
+// 자동차와 비행기 충돌 확인
+function checkCollision() {
+  if (
+    planeX + planeCollisionSize > carX - carCollisionWidth &&
+    planeX - planeCollisionSize < carX + carCollisionWidth &&
+    planeY + planeCollisionSize > carCollisionTop &&
+    planeY - planeCollisionSize < carCollisionBottom
+  ) {
+    hit = 1;
+  } else {
+    hit = 0;
+  }
+
+  if (hit == 1) {
+    shake = random(shakeMin, shakeMax);
+  } else {
+    shake = 0;
+  }
+}
+
+// 마우스 비행기 그리기
+function drawMousePlane() {
+  if (state == 0) {
+    fill(0, 100, 255);
+  } else if (state == 1) {
+    fill(255, 255, 0);
+  } else {
+    fill(255, 0, 0);
+  }
+
+  noStroke();
+  rectMode(CENTER);
+
+  rect(planeX + shake, planeY, bodyWidth, bodyHeight); // 몸통
+  rect(planeX + shake, planeY - planeWingY, wingWidth, wingHeight); // 주날개
+  rect(planeX + shake, planeY + planeTailY, tailWidth, tailHeight); // 꼬리날개
+  ellipse(planeX + shake, planeY - planeNoseY, bodyWidth, planeNoseHeight); // 기수
+
+  // 착륙등 그리기 (추가)
+  if (landingLight == 1) {
+    stroke(255, 255, 0);
+    strokeWeight(2);
+
+    // 왼쪽 착륙등 빛
+    line(
+      planeX + shake - 15,
+      planeY - 4,
+      planeX + shake - 15 - lightSize / 2,
+      planeY - 4 - lightSize
+    );
+
+    line(
+      planeX + shake - 15,
+      planeY - 4,
+      planeX + shake - 15 + lightSize / 2,
+      planeY - 4 - lightSize
+    );
+
+    // 오른쪽 착륙등 빛
+    line(
+      planeX + shake + 15,
+      planeY - 4,
+      planeX + shake + 15 - lightSize / 2,
+      planeY - 4 - lightSize
+    );
+
+    line(
+      planeX + shake + 15,
+      planeY - 4,
+      planeX + shake + 15 + lightSize / 2,
+      planeY - 4 - lightSize
+    );
+
+    // 실제 착륙등 (추가)
+    noStroke();
+    fill(255);
+
+    ellipse(planeX + shake - 15, planeY - 4, 5, 5);
+
+    ellipse(planeX + shake + 15, planeY - 4, 5, 5);
+  }
+}
+
+// 마우스를 클릭하면 착륙등 ON/OFF (추가)
+function mousePressed() {
+  if (landingLight == 0) {
+    landingLight = 1;
+    lightSize = 12;
+  } else {
+    landingLight = 0;
+  }
+}
