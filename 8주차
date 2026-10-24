@@ -1,0 +1,1095 @@
+
+let cosmosImg, burstImg, obstacleImg, enemyImg, bonusImg;
+let rockets = [];
+let bgm, catchSound, clapSound, burstSound;
+let soundStarted = 0;
+let musicTime = 0;
+let musicRepeatTime = 30300;
+
+let gameStep = 0;
+let gameResult = 0;
+let stage = 1;
+let score = 0;
+let gameTime = 30;
+let stageTime = 30;
+let previousTime = 0;
+let fullMode = 0;
+let trailMode = 0;
+let controlMode = 0;
+let screenX = 0;
+let screenY = 0;
+let hudBlink = 0;
+let blinkId;
+let mission;
+let missionGrid = [
+  [0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0]
+];
+
+class MissionData {
+}
+
+let planeX = 300;
+let planeY = 520;
+let planeState = 0;
+let planeAngle = 0;
+let planeSpeedX = 0;
+let planeSpeedY = 0;
+let friction = 0.96;
+let shake = 0;
+let rocketDirection = 2;
+
+let skyX = [-60, -170, -280, -390, -500, -610, -720];
+let skyY = [100, 140, 90, 180, 120, 200, 150];
+let skySpeedX = [0, 0, 0, 0, 0, 0, 0];
+let skySpeedY = [0, 0, 0, 0, 0, 0, 0];
+let skyCount = 3;
+let skyColor = 0;
+let planeCountRandom = 0;
+let planeDistance = 0;
+let noiseX = 0;
+
+let starsX = [100, 200, 300, 400, 500];
+let starsY = [100, 150, 80, 200, 130];
+let starVisible = [1, 1, 1, 1, 1];
+let starDistance = 0;
+let starSize = 5;
+let offsetX = 0;
+let offsetY = 0;
+
+let bonusX = 300;
+let bonusY = 140;
+let bonusSize = 28;
+let bonusNoiseX = 0;
+let bonusNoiseY = 10;
+let bonusVisible = 1;
+
+let carX = 300;
+let carSpeed = 4;
+let carJumpY = 0;
+let carJumpSpeed = 0;
+let gravity = 0.6;
+let jumpPower = -10;
+let jump = false;
+let carHit = 0;
+let previousHit = 0;
+
+let obstacleX = 650;
+let obstacleY = 320;
+let obstacleSpeed = 4;
+let obstacleHit = 0;
+let crashX = 300;
+let crashY = 300;
+let burstFrames = 0;
+
+let enemyX = 650;
+let enemyY = 220;
+let enemyAngle = 0;
+
+let landingLight = 0;
+let lightSize = 12;
+let lightMaxSize = 50;
+let mouseActive = 0;
+let mouseReleasedCount = 0;
+
+let i = 0;
+let j = 0;
+let timerArc = 0;
+let timerWidth = 0;
+
+let pressW = 0;
+let pressA = 0;
+let pressS = 0;
+let pressD = 0;
+let pressLeft = 0;
+let pressRight = 0;
+let press1 = 0;
+let press2 = 0;
+let press3 = 0;
+let pressM = 0;
+
+async function setup() {
+  createCanvas(600, 600);
+  imageMode(CENTER);
+  rectMode(CENTER);
+  ellipseMode(CENTER);
+  frameRate(60);
+
+  cosmosImg = await loadImage('data/cosmos.jpg');
+  burstImg = await loadImage('data/burst.png');
+  obstacleImg = await loadImage('data/circle2.png');
+  bonusImg = await loadImage('data/circle1.png');
+  enemyImg = await loadImage('data/enemy.png');
+
+  rockets[0] = await loadImage('data/rocket0.png');
+  rockets[1] = await loadImage('data/rocket1.png');
+  rockets[2] = await loadImage('data/rocket2.png');
+  rockets[3] = await loadImage('data/rocket3.png');
+  rockets[4] = await loadImage('data/rocket4.png');
+
+  bgm = await loadSound('data/latin.mp3');
+  catchSound = await loadSound('data/catch.mp3');
+  clapSound = await loadSound('data/claps.mp3');
+  burstSound = await loadSound('data/burst.mp3');
+
+  mission = new MissionData();
+  mission.dodges = 0;
+  mission.name = 'AIRPLANE MISSION';
+
+  console.log(typeof mission);
+  reset();
+}
+
+function draw() {
+  screenX = width / 2 - 300;
+  screenY = height / 2 - 300;
+
+  if (gameStep == 0) {
+    gameStart();
+  }
+  else if (gameStep == 1) {
+    gameOn();
+  }
+  else if (gameStep == 2) {
+    gameEnd();
+  }
+}
+
+function drawBackground() {
+  if (trailMode == 0 || gameStep != 1) {
+    background(0);
+    image(cosmosImg, width / 2, height / 2, 600, 600);
+  }
+  else {
+    background(0, 10);
+  }
+}
+
+function gameStart() {
+  drawBackground();
+
+  push();
+  translate(screenX, screenY);
+
+  noStroke();
+  fill(0);
+  rect(300, 296, 560, 335);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+
+  textSize(31);
+  text('AIRPLANE MISSION', 300, 175);
+
+  textSize(18);
+  text('PRESS SPACE TO START', 300, 222);
+
+  textSize(14);
+  text('MOUSE: PLANE  |  CLICK: LIGHT', 300, 270);
+  text('LEFT / RIGHT: CAR  |  J: CAR JUMP', 300, 298);
+  text('1 2 3: COLOR  |  M: FLIGHT MODE', 300, 326);
+  text('A/D: TURN  W/S: THRUST (FLIGHT MODE)', 300, 354);
+  text('H: TRAIL  F: FULLSCREEN  I: INFO', 300, 382);
+  text('RIGHT CLICK BONUS ORB FOR +2 SEC', 300, 410);
+
+  pop();
+  noLoop();
+}
+
+function gameOn() {
+  drawBackground();
+  repeatBackgroundMusic();
+
+  push();
+  translate(screenX, screenY);
+
+  movePlayer();
+  changeSkyPlaneColor();
+  moveSkyPlanes();
+  drawSkyPlanes();
+
+  moveEnemy();
+  drawEnemy();
+
+  moveBonus();
+  drawBonus();
+  drawStars();
+
+  drawRoad();
+  moveCar();
+  moveCarJump();
+  moveObstacle();
+  drawObstacle();
+  drawCar();
+  checkCarCollision();
+
+  checkPlaneState();
+
+  if (landingLight == 1 && mouseIsPressed && lightSize < lightMaxSize) {
+    lightSize += 0.2;
+  }
+
+  drawMousePlane();
+
+  checkSkyPlaneCollision();
+  checkEnemyCollision();
+
+  timerProcess();
+  displayGameInfo();
+  checkStage();
+
+  pop();
+}
+
+function startMusic() {
+  if (soundStarted == 0) {
+    bgm.play();
+    soundStarted = 1;
+    musicTime = millis();
+  }
+}
+
+function repeatBackgroundMusic() {
+  if (soundStarted == 1 && millis() - musicTime >= musicRepeatTime) {
+    bgm.play();
+    musicTime = millis();
+  }
+}
+
+function beaconTimer() {
+  hudBlink = 1 - hudBlink;
+}
+
+function timerProcess() {
+  if (gameStep == 1 && millis() - previousTime >= 1000) {
+    previousTime = millis();
+    gameTime--;
+  }
+
+  if (gameStep == 1 && gameTime <= 0) {
+    gameTime = 0;
+    finishGame(0);
+  }
+}
+
+function displayGameInfo() {
+  noStroke();
+  fill(0, 190);
+  rect(300, 20, 600, 40);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(15);
+
+  text('STAGE: ' + stage, 57, 18);
+  text('STARS: ' + score, 160, 18);
+  text('PLANES: ' + skyCount, 277, 18);
+  text('TIME: ' + gameTime, 388, 18);
+  text('DODGE: ' + mission.dodges, 502, 18);
+
+  timerWidth = map(gameTime, 0, stageTime, 0, 300);
+  timerWidth = constrain(timerWidth, 0, 300);
+
+  fill(255);
+  rect(190, 45, 300, 8);
+
+  fill(255, 0, 0);
+  rect(40 + timerWidth / 2, 45, timerWidth, 8);
+
+  fill(255);
+  textSize(11);
+  text('FPS ' + nf(frameRate(), 2, 1), 540, 45);
+
+  timerArc = map(gameTime, 0, stageTime, 0, radians(360));
+
+  fill(255, 200, 0);
+  noStroke();
+  arc(565, 85, 32, 32, 0, timerArc);
+
+  if (hudBlink == 1 || frameCount % 30 < 10) {
+    fill(255, 0, 0);
+    noStroke();
+    ellipse(28, 84, 11, 11);
+  }
+
+  noFill();
+  stroke(255);
+  strokeWeight(1);
+  ellipse(28, 84, 19, 19);
+
+  strokeWeight(5);
+
+  for (i = 0; i < 3; i++) {
+    for (j = 0; j < 5; j++) {
+      if (missionGrid[i][j] == 1) {
+        stroke(0, 255, 0);
+      }
+      else {
+        stroke(255, 255, 255);
+      }
+
+      point(497 + j * 17, 540 + i * 14);
+    }
+  }
+
+  noStroke();
+  fill(255);
+  textSize(10);
+  text('STAGE RECORD', 540, 530);
+
+  if (controlMode == 1) {
+    text('FLIGHT', 65, 572);
+  }
+  else {
+    text('MOUSE', 65, 572);
+  }
+
+  if (mouseActive == 1) {
+    text('POINTER', 174, 572);
+  }
+}
+
+function movePlayer() {
+  if (controlMode == 0) {
+    planeX = constrain(mouseX - screenX, 25, 575);
+    planeY = constrain(mouseY - screenY, 30, 570);
+
+    planeAngle = 0;
+    planeSpeedX = 0;
+    planeSpeedY = 0;
+  }
+  else {
+    if (pressA == 1) {
+      planeAngle -= 0.05;
+      rocketDirection = 0;
+    }
+
+    if (pressD == 1) {
+      planeAngle += 0.05;
+      rocketDirection = 1;
+    }
+
+    if (pressW == 1) {
+      planeSpeedX += sin(planeAngle) * 0.45;
+      planeSpeedY -= cos(planeAngle) * 0.45;
+      rocketDirection = 2;
+    }
+
+    if (pressS == 1) {
+      planeSpeedX -= sin(planeAngle) * 0.25;
+      planeSpeedY += cos(planeAngle) * 0.25;
+      rocketDirection = 3;
+    }
+
+    planeSpeedX *= friction;
+    planeSpeedY *= friction;
+
+    planeX += planeSpeedX;
+    planeY += planeSpeedY;
+
+    planeX = constrain(planeX, 25, 575);
+    planeY = constrain(planeY, 30, 570);
+  }
+}
+
+function checkPlaneState() {
+  if (planeY - 25 > 480) {
+    planeState = 0;
+  }
+  else if (planeY - 25 > 330) {
+    planeState = 1;
+  }
+  else {
+    planeState = 2;
+  }
+}
+
+function drawMousePlane() {
+  push();
+  translate(planeX + shake, planeY);
+  rotate(planeAngle);
+
+  noStroke();
+
+  if (planeState == 0) {
+    fill(0, 100, 255);
+  }
+  else if (planeState == 1) {
+    fill(255, 255, 0);
+  }
+  else {
+    fill(255, 0, 0);
+  }
+
+  if (controlMode == 0) {
+    rect(0, 0, 10, 49);
+    rect(0, -4, 49, 10);
+    rect(0, 19, 25, 7);
+    ellipse(0, -25, 10, 13);
+  }
+  else {
+    stroke(255);
+    strokeWeight(3);
+    noFill();
+
+    if (planeState == 0) {
+      stroke(0, 100, 255);
+    }
+    else if (planeState == 1) {
+      stroke(255, 255, 0);
+    }
+    else {
+      stroke(255, 0, 0);
+    }
+
+    ellipse(0, 0, 46, 60);
+    noStroke();
+
+    image(rockets[rocketDirection], 0, 0, 42, 50);
+
+    stroke(255, 255, 0);
+    strokeWeight(1);
+    noFill();
+
+    beginShape();
+    vertex(-9, -30);
+    vertex(0, -35);
+    vertex(9, -30);
+    endShape();
+  }
+
+  if (landingLight == 1) {
+    stroke(255, 255, 0);
+    strokeWeight(2);
+
+    line(-15, -4, -15 - lightSize / 2, -4 - lightSize);
+    line(-15, -4, -15 + lightSize / 2, -4 - lightSize);
+    line(15, -4, 15 - lightSize / 2, -4 - lightSize);
+    line(15, -4, 15 + lightSize / 2, -4 - lightSize);
+
+    noStroke();
+    fill(255);
+
+    ellipse(-15, -4, 5, 5);
+    ellipse(15, -4, 5, 5);
+  }
+
+  pop();
+}
+
+function changeSkyPlaneColor() {
+  switch (1) {
+    case press1:
+      skyColor = 1;
+      break;
+
+    case press2:
+      skyColor = 2;
+      break;
+
+    case press3:
+      skyColor = 3;
+      break;
+
+    default:
+      skyColor = 0;
+      break;
+  }
+}
+
+function moveSkyPlanes() {
+  for (i = 0; i < skyCount; i++) {
+    skyX[i] += skySpeedX[i];
+
+    noiseX = frameCount * 0.02 + i * 10;
+
+    skyY[i] += skySpeedY[i] + map(
+      noise(noiseX), 0, 1, -1, 1
+    );
+
+    skyY[i] = constrain(skyY[i], 65, 275);
+
+    if (skyX[i] > 630) {
+      skyX[i] = -30;
+      skyY[i] = random(65, 275);
+    }
+  }
+}
+
+function drawSkyPlanes() {
+  rectMode(CENTER);
+
+  if (skyColor == 0) {
+    fill(0);
+  }
+  else if (skyColor == 1) {
+    fill(255, 0, 0);
+  }
+  else if (skyColor == 2) {
+    fill(0, 255, 0);
+  }
+  else {
+    fill(0, 100, 255);
+  }
+
+  stroke(255);
+  strokeWeight(1);
+
+  for (i = 0; i < skyCount; i++) {
+    rect(skyX[i], skyY[i], 24, 3);
+    ellipse(skyX[i] + 12, skyY[i], 5, 4);
+    rect(skyX[i], skyY[i] + 3, 10, 3);
+    rect(skyX[i] - 9, skyY[i] - 3, 4, 6);
+  }
+
+  noStroke();
+}
+
+function checkSkyPlaneCollision() {
+  for (i = 0; i < skyCount; i++) {
+    planeDistance = dist(
+      planeX, planeY, skyX[i], skyY[i]
+    );
+
+    if (gameStep == 1 && planeDistance < 29) {
+      finishGame(0);
+    }
+  }
+}
+
+function moveEnemy() {
+  enemyAngle += 0.05;
+  enemyY = 220 + sin(enemyAngle) * 42;
+
+  if (stage > 1) {
+    enemyX -= 2 + stage;
+
+    if (enemyX < -40) {
+      enemyX = 650;
+    }
+  }
+}
+
+function drawEnemy() {
+  if (stage > 1) {
+    image(enemyImg, enemyX, enemyY, 44, 35);
+  }
+}
+
+function checkEnemyCollision() {
+  if (stage > 1 && gameStep == 1) {
+    if (dist(planeX, planeY, enemyX, enemyY) < 32) {
+      finishGame(0);
+    }
+  }
+}
+
+function moveBonus() {
+  if (bonusVisible == 1) {
+    bonusX = map(noise(bonusNoiseX), 0, 1, 80, 520);
+    bonusY = map(noise(bonusNoiseY), 0, 1, 95, 285);
+
+    bonusNoiseX += 0.009;
+    bonusNoiseY += 0.009;
+  }
+}
+
+function drawBonus() {
+  if (bonusVisible == 1) {
+    image(bonusImg, bonusX, bonusY, bonusSize, bonusSize);
+
+    noFill();
+    stroke(255, 255, 0);
+    ellipse(bonusX, bonusY, bonusSize + 6, bonusSize + 6);
+    noStroke();
+  }
+}
+
+function drawStars() {
+  for (i = 0; i < 5; i++) {
+    if (starVisible[i] == 1) {
+      starDistance = dist(
+        planeX, planeY, starsX[i], starsY[i]
+      );
+
+      if (starDistance < 60) {
+        fill(
+          255 - starDistance * 255 / 60,
+          255 - starDistance * 255 / 60,
+          0
+        );
+
+        starSize = map(starDistance, 0, 60, 10, 5);
+      }
+      else {
+        fill(0);
+        starSize = 5;
+      }
+
+      stroke(255);
+      strokeWeight(1);
+      ellipse(starsX[i], starsY[i], starSize, starSize);
+      noStroke();
+
+      if (starDistance < 8) {
+        starVisible[i] = 0;
+        missionGrid[stage - 1][i] = 1;
+        score++;
+
+        catchSound.play();
+      }
+
+      else if (starDistance < 15) {
+        stroke(255, 255, 0);
+        strokeWeight(1);
+
+        for (j = 0; j < 6; j++) {
+          offsetX = random(-15, 15);
+          offsetY = random(-15, 15);
+
+          line(
+            planeX, planeY,
+            planeX + offsetX,
+            planeY + offsetY
+          );
+        }
+
+        noStroke();
+      }
+    }
+  }
+}
+
+function drawRoad() {
+  stroke(255, 255, 0);
+  strokeWeight(4);
+  line(0, 330, 600, 330);
+
+  strokeWeight(3);
+
+  for (i = 0; i < 600; i += 40) {
+    line(i, 480, i + 20, 480);
+  }
+
+  noStroke();
+}
+
+function moveCar() {
+  if (pressLeft == 1 || keyIsDown(LEFT_ARROW)) {
+    carX -= carSpeed;
+  }
+
+  if (pressRight == 1 || keyIsDown(RIGHT_ARROW)) {
+    carX += carSpeed;
+  }
+
+  carX = constrain(carX, 30, 570);
+}
+
+function moveCarJump() {
+  if (jump == true) {
+    carJumpSpeed += gravity;
+    carJumpY += carJumpSpeed;
+
+    if (carJumpY >= 0) {
+      carJumpY = 0;
+      carJumpSpeed = 0;
+      jump = false;
+    }
+  }
+}
+
+function drawCar() {
+  rectMode(CENTER);
+  noStroke();
+  fill(255);
+
+  rect(carX, 311 + carJumpY, 60, 18);
+  rect(carX, 300 + carJumpY, 36, 15);
+
+  ellipse(carX - 18, 323 + carJumpY, 11, 11);
+  ellipse(carX + 18, 323 + carJumpY, 11, 11);
+
+  fill(0);
+  rect(carX - 9, 300 + carJumpY, 9, 8);
+  rect(carX + 9, 300 + carJumpY, 9, 8);
+}
+
+function moveObstacle() {
+  obstacleX -= obstacleSpeed;
+
+  if (obstacleX < -25) {
+    if (obstacleHit == 0) {
+      mission.dodges++;
+    }
+
+    obstacleHit = 0;
+    obstacleX = random(620, 760);
+  }
+
+  if (dist(carX, 311 + carJumpY, obstacleX, obstacleY) < 28) {
+    if (obstacleHit == 0) {
+      obstacleHit = 1;
+      burstSound.play();
+
+      crashX = carX;
+      crashY = 311 + carJumpY;
+      burstFrames = 15;
+    }
+  }
+}
+
+function drawObstacle() {
+  image(obstacleImg, obstacleX, obstacleY, 24, 24);
+
+  if (burstFrames > 0) {
+    image(burstImg, crashX, crashY, 40, 40);
+    burstFrames--;
+  }
+}
+
+function checkCarCollision() {
+  if (
+    planeX + 25 > carX - 30 &&
+    planeX - 25 < carX + 30 &&
+    planeY + 25 > 290 + carJumpY &&
+    planeY - 25 < 330 + carJumpY
+  ) {
+    carHit = 1;
+  }
+  else {
+    carHit = 0;
+  }
+
+  if (carHit == 1) {
+    shake = random(-5, 5);
+
+    if (previousHit == 0) {
+      burstSound.play();
+    }
+  }
+  else {
+    shake = 0;
+  }
+
+  previousHit = carHit;
+}
+
+function checkStage() {
+  if (gameStep == 1 && score >= 5) {
+    if (stage < 3) {
+      clapSound.play();
+      stage++;
+      resetStage();
+    }
+    else {
+      finishGame(1);
+    }
+  }
+}
+
+function resetStage() {
+  score = 0;
+  carHit = 0;
+  previousHit = 0;
+  shake = 0;
+
+  bonusVisible = 1;
+  bonusSize = 28;
+  bonusNoiseX = 0;
+  bonusNoiseY = 10;
+
+  carJumpY = 0;
+  carJumpSpeed = 0;
+  jump = false;
+
+  obstacleX = 650;
+  obstacleHit = 0;
+  burstFrames = 0;
+  enemyX = 650;
+
+  for (i = 0; i < 5; i++) {
+    starVisible[i] = 1;
+    starsX[i] = random(40, 560);
+    starsY[i] = random(100, 280);
+  }
+
+  planeCountRandom = random(0, 3);
+
+  if (planeCountRandom < 1) {
+    skyCount = 3;
+  }
+  else if (planeCountRandom < 2) {
+    skyCount = 4;
+  }
+  else {
+    skyCount = 5;
+  }
+
+  if (stage == 1) {
+    gameTime = 30;
+  }
+  else if (stage == 2) {
+    gameTime = 25;
+    skyCount++;
+  }
+  else {
+    gameTime = 20;
+    skyCount += 2;
+  }
+
+  stageTime = gameTime;
+  obstacleSpeed = 3 + stage;
+
+  for (i = 0; i < 7; i++) {
+    skyX[i] = -60 - i * 110;
+    skyY[i] = random(65, 275);
+
+    if (stage == 1) {
+      skySpeedX[i] = random(2.5, 4);
+    }
+    else if (stage == 2) {
+      skySpeedX[i] = random(4.5, 6.5);
+    }
+    else {
+      skySpeedX[i] = random(7, 10);
+    }
+
+    skySpeedY[i] = random(-0.15, 0.15);
+  }
+
+  previousTime = millis();
+}
+
+function reset() {
+  stage = 1;
+  gameResult = 0;
+
+  planeX = 300;
+  planeY = 520;
+  planeAngle = 0;
+  planeSpeedX = 0;
+  planeSpeedY = 0;
+  rocketDirection = 2;
+
+  carX = 300;
+  landingLight = 0;
+  lightSize = 12;
+
+  mission.dodges = 0;
+
+  trailMode = 0;
+  controlMode = 0;
+
+  pressW = 0;
+  pressA = 0;
+  pressS = 0;
+  pressD = 0;
+
+  pressLeft = 0;
+  pressRight = 0;
+
+  press1 = 0;
+  press2 = 0;
+  press3 = 0;
+  pressM = 0;
+
+  for (i = 0; i < 3; i++) {
+    for (j = 0; j < 5; j++) {
+      missionGrid[i][j] = 0;
+    }
+  }
+
+  resetStage();
+}
+
+function finishGame(result) {
+  if (gameStep == 1) {
+    gameResult = result;
+    gameStep = 2;
+
+    clearInterval(blinkId);
+
+    if (result == 1) {
+      clapSound.play();
+    }
+    else {
+      burstSound.play();
+    }
+  }
+}
+
+function gameEnd() {
+  drawBackground();
+
+  push();
+  translate(screenX, screenY);
+
+  fill(0);
+  noStroke();
+  rect(300, 300, 555, 230);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(44);
+
+  if (gameResult == 1) {
+    image(rockets[4], 410, 252, 27, 45);
+    text('YOU WIN!', 300, 250);
+  }
+  else {
+    image(burstImg, 300, 247, 65, 65);
+    text('GAME OVER', 300, 300);
+  }
+
+  textSize(18);
+  text('SPACE: RESTART', 300, 370);
+  text('DODGES: ' + mission.dodges, 300, 399);
+
+  pop();
+  noLoop();
+}
+
+function mousePressed() {
+  if (gameStep == 1) {
+    if (mouseButton === LEFT) {
+      if (landingLight == 0) {
+        landingLight = 1;
+        lightSize = 12;
+      }
+      else {
+        landingLight = 0;
+      }
+    }
+
+    if (mouseButton === RIGHT && bonusVisible == 1) {
+      if (
+        dist(
+          mouseX - screenX,
+          mouseY - screenY,
+          bonusX,
+          bonusY
+        ) < bonusSize / 2
+      ) {
+        bonusSize += 10;
+        gameTime += 2;
+
+        gameTime = constrain(gameTime, 0, stageTime);
+        catchSound.play();
+
+        if (bonusSize > 52) {
+          bonusVisible = 0;
+        }
+      }
+    }
+  }
+}
+
+function mouseReleased() {
+  mouseReleasedCount++;
+
+  if (landingLight == 1 && lightSize > 50) {
+    lightSize = 50;
+  }
+}
+
+function mouseMoved() {
+  mouseActive = 1;
+
+  if (gameStep == 0 || gameStep == 2) {
+    redraw();
+  }
+}
+
+function mouseDragged() {
+  if (landingLight == 1 && lightSize < lightMaxSize) {
+    lightSize += 0.5;
+  }
+}
+
+function keyReleased() {
+  if (keyCode == 87) pressW = 0;
+  if (keyCode == 65) pressA = 0;
+  if (keyCode == 83) pressS = 0;
+  if (keyCode == 68) pressD = 0;
+
+  if (keyCode == 37) pressLeft = 0;
+  if (keyCode == 39) pressRight = 0;
+
+  if (keyCode == 49) press1 = 0;
+  if (keyCode == 50) press2 = 0;
+  if (keyCode == 51) press3 = 0;
+
+  if (keyCode == 77) pressM = 0;
+
+  skyColor = 0;
+}
+
+function keyPressed() {
+  if (keyCode == 87) pressW = 1;
+  if (keyCode == 65) pressA = 1;
+  if (keyCode == 83) pressS = 1;
+  if (keyCode == 68) pressD = 1;
+
+  if (keyCode == 37) pressLeft = 1;
+  if (keyCode == 39) pressRight = 1;
+
+  if (keyCode == 49) press1 = 1;
+  if (keyCode == 50) press2 = 1;
+  if (keyCode == 51) press3 = 1;
+
+  if (keyCode == 70) {
+    fullMode = 1;
+    fullscreen(true);
+    resizeCanvas(windowWidth, windowHeight);
+  }
+
+  if (keyCode == 73) {
+    print('Stage: ' + stage + ', Score: ' + score);
+    console.log(typeof mission);
+  }
+
+  if (key == ' ') {
+    if (gameStep == 0 || gameStep == 2) {
+      reset();
+      gameStep = 1;
+      previousTime = millis();
+
+      clearInterval(blinkId);
+      blinkId = setInterval(beaconTimer, 500);
+
+      startMusic();
+      loop();
+    }
+  }
+  else if (gameStep == 1) {
+    if (keyCode == 74 && jump == false) {
+      carJumpSpeed = jumpPower;
+      jump = true;
+      catchSound.play();
+    }
+
+    if (keyCode == 77 && pressM == 0) {
+      pressM = 1;
+      controlMode = (controlMode + 1) % 2;
+
+      planeSpeedX = 0;
+      planeSpeedY = 0;
+      rocketDirection = 2;
+    }
+
+    if (keyCode == 72) {
+      trailMode = (trailMode + 1) % 2;
+    }
+  }
+}
+
+function windowResized() {
+  if (fullMode == 1) {
+    resizeCanvas(windowWidth, windowHeight);
+  }
+  else {
+    resizeCanvas(600, 600);
+  }
+}
